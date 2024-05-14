@@ -1,7 +1,7 @@
 # mongodump-python
 
 ## Description
-Mongodump-python is a Python tool for performing MongoDB backups using the `mongodump` utility. This tool allows you to dump specific collections from your MongoDB database according to a specified number of days.
+Mongodump-python is a Python script for performing MongoDB backups. This tool allows you to dump specific collections from your MongoDB database according to a specified number of days.
 
 ## Features
 - Perform MongoDB backups using Python;

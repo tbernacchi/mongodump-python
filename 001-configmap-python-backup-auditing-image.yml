@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-backup-auditing
+  namespace: test
+data:
+  days: "30" 
+  host: "mongodb-novo-0.mongodb-novo-headless"
+  project: "my-project"

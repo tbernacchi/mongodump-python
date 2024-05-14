@@ -1,0 +1,83 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  generation: 2
+  labels:
+    app: mongodb-dump-database
+    type: backup-job
+  name: mongodb-dump-database
+  namespace: test
+spec:
+  schedule: "*/1 * * * *"
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            container.apparmor.security.beta.kubernetes.io/mongodb-dump-database: runtime/default  # Updated AppArmor profile. Wiz recommendation.
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: mongodb-novo
+          automountServiceAccountToken: false 
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node_pool
+                        operator: In
+                        values:
+                          - "mongodb-pipeline"
+          containers:
+            - name: mongodb-dump-database
+              image: us-docker.pkg.dev/mongo-backup-image/mongo-backup:0.2.9
+              imagePullPolicy: Always
+              env:
+                - name: DAYS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mongodump
+                      key: days
+                - name: HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mongodump
+                      key: host
+                - name: MONGO_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongodb-pipeline-credentials
+                      key: mongodb-root-password
+                - name: PROJECT_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mongodump
+                      key: project
+              securityContext:
+                capabilities:
+                  drop:
+                    - NET_RAW  # Drop NET_RAW capability to mitigate risk of network scanning. Wiz recommendation.
+                    - SYS_MODULE  # Drop SYS_MODULE capability to prevent loading kernel modules. Wiz recommendation.
+                runAsNonRoot: true
+                runAsUser: 10000  # Set a non-root UID for the container
+                readOnlyRootFilesystem: false
+                allowPrivilegeEscalation: false
+              resources:
+                requests:
+                  cpu: "0.1"
+                  memory: "128Mi"
+                limits:
+                  cpu: "1"
+                  memory: "512Mi"
+          tolerations:
+            - key: "node_pool"
+              operator: "Equal"
+              value: "mongodb-pipeline"
+              effect: "NoSchedule"
+            - key: "node_pool"
+              operator: "Equal"
+              value: "mongodb-pipeline"
+              effect: "NoExecute"
+              

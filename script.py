@@ -129,7 +129,8 @@ for collection in collection_names:
                 for date_range in date_ranges:
                     date_start = date_range[0]
                     date_end = date_range[1]
-                    for doc in db[collection].find({'dateStart': {"$gte": date_start, "$lt": date_end}}):
+                    for doc in db[collection].find({'$and': [{'dateStart': {"$gte": date_start}},
+                                                             {'dateEnd': {'$lt': date_end}}]}):
                         dump_file.write(bson.BSON.encode(doc))  # Serialize each document to BSON
             continue
         # Dump all the collections data without query    

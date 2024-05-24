@@ -7,42 +7,18 @@ import json
 import uuid
 from google.cloud import storage
 
-
 def get_date_days_ago_ms():
-    default_split_days = 30
-    split_by_month = []
-    date = 0
-
     # Calculates the timestamp x days ago in milliseconds.
-    # if this is less than default_split_days we will have a problem WARNING!
-    days = int(os.environ.get('DAYS'))  # Days to keep the data.
-    number_of_months = days // default_split_days
-
-    register_start = True
-    days_ago = datetime.now() - timedelta(days=days)
-
-    for _ in range(number_of_months):
-        date_start = int(days_ago.strftime("%s000"))
-
-        days_forward = days_ago + timedelta(days=default_split_days)
-        date_end = int(days_forward.strftime("%s000"))
-
-        if register_start:
-            date = date_start
-            register_start = False
-
-        split_by_month.append((date_start, date_end))
-
-        days_ago = days_forward + timedelta(days=1)
-
-    return date, split_by_month
-
+    days = int(os.environ.get('DAYS')) # Days to keep the data.
+    ninety_days_ago = datetime.now() - timedelta(days=days)
+    date = int(ninety_days_ago.strftime("%s000")) 
+    return date
 
 # Get the number of days from the environment variable
 days_value = os.environ.get('DAYS')
 print(f"Number of days: {days_value}")
 
-milliseconds, date_ranges = get_date_days_ago_ms()
+milliseconds = get_date_days_ago_ms()
 print(f"Timestamp {days_value} in milliseconds:{milliseconds}")
 
 # Connection details
@@ -52,12 +28,12 @@ host = os.environ.get('HOST')
 port = 27017
 replica_set = "rs0"
 authSource = "admin"
-mongo_db_pipeline = "database"
+mongo_db_pipeline = "pipelinecore"
 
 connection_uri = f"mongodb://{mongo_user}:{mongo_pass}@{host}:{port}/?replicaSet={replica_set}&authSource={authSource}"
-#print(f"Connection URI: {connection_uri}")
+print(f"Connection URI: {connection_uri}")
 
-#print(f"Connection String: {connection_uri}")
+print(f"Connection String: {connection_uri}")
 print(f"Database Name: {mongo_db_pipeline}")
 
 # Connect to MongoDB replica set
@@ -70,7 +46,7 @@ print(f"Connection successful on { mongo_db_pipeline }...")
 collection_names = db.list_collection_names()
 
 # Collection auditing
-AUDITING_COLLECTION = "auditing"
+collection_name     = "auditing"
 query               = { "dateStart": {"$gte": milliseconds }} # Query to filter documents.
 output_dir          = "/tmp/dump-mongo"
 
@@ -124,13 +100,10 @@ for collection in collection_names:
         print(f"Metadata of collection {collection} saved to {metadata_filename} successfully...")
     
         # Dump the collection auditing data with query
-        if collection == AUDITING_COLLECTION:
-            with gzip.open(f"{output_dir}/{AUDITING_COLLECTION}-{days}.bson.gz", "wb") as dump_file:
-                for date_range in date_ranges:
-                    date_start = date_range[0]
-                    date_end = date_range[1]
-                    for doc in db[collection].find({'dateStart': {"$gte": date_start, "$lt": date_end}}):
-                        dump_file.write(bson.BSON.encode(doc))  # Serialize each document to BSON
+        if collection  == collection_name:
+            with gzip.open(f"{output_dir}/{collection_name}-{days}.bson.gz", "wb") as dump_file:
+                for doc in db[collection].find({'dateStart': {"$gte": milliseconds}}):
+                    dump_file.write(bson.BSON.encode(doc))  # Serialize each document to BSON
             continue
         # Dump all the collections data without query    
         with gzip.open(f"{output_dir}/{collection}.bson.gz", "wb") as dump_file:
@@ -139,7 +112,7 @@ for collection in collection_names:
         print(f"Collection {collection} dumped to {output_dir}/{collection}.bson.gz successfully...")
 
     except Exception as e:
-        print(f"Error retrieving metadata and dumping data for collection {AUDITING_COLLECTION}: {e}")
+        print(f"Error retrieving metadata and dumping data for collection {collection_name}: {e}")
 
 print("All metadata and collection data dumped successfully!")
 
@@ -151,7 +124,7 @@ timestamp = current_datetime.strftime("%Y_%m_%d__%H:%M")
 project_name = os.environ.get("PROJECT_NAME")
 
 # Define the destination bucket and folder names
-destination_folder_name = "database"
+destination_folder_name = "pipelinecore"
 destination_bucket_name = f"{project_name}-mongo-backup"
 
 # Iterate over the files in the output directory
@@ -172,8 +145,3 @@ for file in os.listdir(output_dir):
 
 print(f"Uploading files to gs://{destination_bucket_name}/{destination_blob_folder}...")
 print("All files uploaded successfully!")
-
-
-
-
-
